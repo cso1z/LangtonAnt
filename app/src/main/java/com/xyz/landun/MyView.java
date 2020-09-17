@@ -8,6 +8,7 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.Handler;
+import android.os.Looper;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
@@ -22,31 +23,59 @@ import androidx.core.content.ContextCompat;
  */
 public class MyView extends View {
 
-    final int DEFAULT_SINGLE_GRID_WIDTH = 30;
-    int singleGridWidth = DEFAULT_SINGLE_GRID_WIDTH;
-    final int LINE_WIDTH = 2;
+    //默认单个表格宽高值
+    private final int DEFAULT_SINGLE_GRID_WIDTH = 30;
+    //单个表格宽高值
+    private int singleGridWidth = DEFAULT_SINGLE_GRID_WIDTH;
+    //表格线宽度
+    private final int LINE_WIDTH = 2;
 
-    final int DEFAULT_VALUE = 0;
-    final int WHITE = 1;
-    final int BLACK = 2;
-    final int ANT_LEFT = 3;
-    final int ANT_TOP = 4;
-    final int ANT_RIGHT = 5;
-    final int ANT_BOTTOM = 6;
-    Bitmap antBitmap;
-    Rect bitmapRect;
+    //表格中默认数据
+    private final int DEFAULT_VALUE = 0;
+    //白色方格
+    private final int WHITE = 1;
+    //黑色方格
+    private final int BLACK = 2;
 
-    final int size = 150;
+    //蚂蚁头方向
+    private final int ANT_LEFT = 3;
+    private final int ANT_TOP = 4;
+    private final int ANT_RIGHT = 5;
+    private final int ANT_BOTTOM = 6;
 
-    private int delayMillis = 10;
+    // 表格宽、高数量
+    private final int size = 300;
 
-    int[][] grid = new int[size][size];
-    int currentX;
-    int currentY;
-    int currentDir;
+    //屏幕中间点
+    private int centerX, centerY;
 
-    Handler handler;
-    Scroller mScroller;
+
+    //自动下一步间隔时间（毫秒）
+    private int delayMillis;
+
+    //“蚂蚁”图片
+    private Bitmap antBitmap;
+    private Rect bitmapRect;
+
+    //表格数据
+    private int[][] grid;
+    //当前蚂蚁处于表格中的下标
+    private int currentX;
+    private int currentY;
+    //当前蚂蚁头方向
+    private int currentDir;
+
+    //蚂蚁走过的表格下标最值
+    int minX, maxX, minY, maxY;
+
+    //是否自动下一步
+    boolean autoNext = false;
+
+    private Rect rect;
+    private Paint paint;
+
+    private Handler handler;
+    private Scroller mScroller;
 
     public MyView(Context context) {
         this(context, null);
@@ -62,38 +91,48 @@ public class MyView extends View {
     }
 
     private void init() {
-        handler = new Handler();
+        handler = new Handler(Looper.getMainLooper());
+        //设置背景色
         setBackgroundColor(0x88888888);
 
         rect = new Rect();
         bitmapRect = new Rect();
         paint = new Paint();
 
-        currentDir = ANT_RIGHT;
-        currentX = size / 2;
-        currentY = size / 2;
-        minX = currentX;
-        maxX = currentX;
-        minY = currentY;
-        maxY = currentY;
+        initData();
 
         Drawable drawable = ContextCompat.getDrawable(getContext(), R.drawable.ant);
         antBitmap = ImageUtils.drawable2Bitmap(drawable);
 
         mScroller = new Scroller(getContext());
-        goNext();
         getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
             @Override
             public boolean onPreDraw() {
+                //绘制完成后、移动至表格中间
                 getViewTreeObserver().removeOnPreDrawListener(this);
                 scrollToCenter();
                 return true;
             }
         });
-
     }
 
-    int centerX, centerY;
+    private void initData() {
+        grid = new int[size][size];
+        //蚂蚁初始位置为表格中间
+        currentX = size / 2;
+        currentY = size / 2;
+        //蚂蚁初始方向为“右”
+        currentDir = ANT_RIGHT;
+        minX = currentX;
+        maxX = currentX;
+        minY = currentY;
+        maxY = currentY;
+        //默认不自动下一步
+        autoNext = false;
+        //默认自动下一步间隔为5ms
+        delayMillis = 5;
+    }
+
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
@@ -118,8 +157,6 @@ public class MyView extends View {
         mScroller.startScroll(mScroller.getFinalX(), mScroller.getFinalY(), x, y, 0);
     }
 
-    Rect rect;
-    Paint paint;
 
     @Override
     protected void onDraw(Canvas canvas) {
@@ -128,13 +165,16 @@ public class MyView extends View {
             paint.setColor(Color.RED);
             paint.setStyle(Paint.Style.FILL);
             paint.setStrokeWidth(LINE_WIDTH);
+            //绘制表格竖线
             canvas.drawLine(singleGridWidth * x, 0, singleGridWidth * x, singleGridWidth * (size - 1), paint);
             for (int y = 0; y < size; y++) {
                 paint.setColor(Color.RED);
                 paint.setStrokeWidth(LINE_WIDTH);
+                //绘制表格横线
                 canvas.drawLine(0, singleGridWidth * y, singleGridWidth * (size - 1), singleGridWidth * y, paint);
                 rect.set(x * (int) singleGridWidth + LINE_WIDTH, y * (int) singleGridWidth + LINE_WIDTH, (x + 1) * (int) singleGridWidth - LINE_WIDTH,
                         (y + 1) * (int) singleGridWidth - LINE_WIDTH);
+                //绘制单个表格颜色
                 if (grid[x][y] == WHITE) {
                     paint.setColor(Color.WHITE);
                     canvas.drawRect(rect, paint);
@@ -142,6 +182,8 @@ public class MyView extends View {
                     paint.setColor(Color.BLACK);
                     canvas.drawRect(rect, paint);
                 }
+
+                //绘制当前蚂蚁（位置、头方向）
                 if (x == currentX && y == currentY) {
                     int degrees = 0;
                     if (currentDir == ANT_TOP) {
@@ -157,20 +199,40 @@ public class MyView extends View {
                 }
             }
         }
+        //绘制蚂蚁走过的矩形范围
         rect.set(minX * singleGridWidth, minY * singleGridWidth, (maxX + 1) * singleGridWidth, (maxY + 1) * singleGridWidth);
         paint.setStyle(Paint.Style.STROKE);
         paint.setColor(Color.YELLOW);
         canvas.drawRect(rect, paint);
     }
 
-    int lastX;
-    int lastY;
-    int minX, maxX, minY, maxY;
+    //设置蚂蚁移动下一步
+    public void autoNext() {
+        autoNext = true;
+        next();
+    }
 
+    //停止下一步停止
+    public void stop() {
+        autoNext = false;
+    }
 
-    private void goNext() {
-        lastX = currentX;
-        lastY = currentY;
+    //蚂蚁走下一步
+    public void goNext() {
+        autoNext = false;
+        next();
+    }
+
+    //格式化表格
+    public void reset() {
+        initData();
+        invalidate();
+    }
+
+    //计算蚂蚁下一位置以及修改当前位置颜色
+    private void next() {
+        int lastX = currentX;
+        int lastY = currentY;
         if (grid[currentX][currentY] == DEFAULT_VALUE || grid[currentX][currentY] == WHITE) {
             switch (currentDir) {
                 case ANT_LEFT:
@@ -235,7 +297,9 @@ public class MyView extends View {
         handler.postDelayed(new Runnable() {
             @Override
             public void run() {
-                goNext();
+                if (autoNext) {
+                    next();
+                }
             }
         }, delayMillis);
     }
@@ -256,13 +320,13 @@ public class MyView extends View {
                 mLastDirX = x;
                 break;
             case MotionEvent.ACTION_MOVE:
-                    //只有一个手指的时候才有移动的操作
-                    int dy = mLastDirY - y;
-                    int dx = mLastDirX - x;
-                    mScroller.startScroll(mScroller.getFinalX(), mScroller.getFinalY(), dx, dy, 0);
-                    invalidate();
-                    mLastDirY = y;
-                    mLastDirX = x;
+                //只有一个手指的时候才有移动的操作
+                int dy = mLastDirY - y;
+                int dx = mLastDirX - x;
+                mScroller.startScroll(mScroller.getFinalX(), mScroller.getFinalY(), dx, dy, 0);
+                invalidate();
+                mLastDirY = y;
+                mLastDirX = x;
                 break;
             default:
         }
@@ -278,16 +342,7 @@ public class MyView extends View {
         }
     }
 
-    private double spacing(MotionEvent event) {
-        if (event.getPointerCount() == 2) {
-            float x = event.getX(0) - event.getX(1);
-            float y = event.getY(0) - event.getY(1);
-            return Math.sqrt(x * x + y * y);
-        } else {
-            return 0;
-        }
-    }
-
+    //滚动到中心点
     private void scrollToCenter() {
         int sX = currentX * singleGridWidth - centerX;
         int sY = currentY * singleGridWidth - centerY;

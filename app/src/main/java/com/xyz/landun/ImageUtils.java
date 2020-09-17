@@ -52,7 +52,6 @@ public class ImageUtils {
     }
 
 
-    //Rotate Bitmap
     public static Bitmap rotate(Bitmap b, float degrees) {
         if (degrees != 0 && b != null) {
             try {
@@ -63,7 +62,6 @@ public class ImageUtils {
                 Bitmap b2 = Bitmap.createBitmap(b, 0, 0, b.getWidth(),
                         b.getHeight(), m, true);
                 if (b != b2) {
-//                    b.recycle();
                     b = b2;
                 }
             } catch (Exception e) {
