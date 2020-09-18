@@ -157,6 +157,7 @@ public class MyView extends View {
         mScroller.startScroll(mScroller.getFinalX(), mScroller.getFinalY(), x, y, 0);
     }
 
+    Bitmap temp;
 
     @Override
     protected void onDraw(Canvas canvas) {
@@ -193,7 +194,7 @@ public class MyView extends View {
                     } else if (currentDir == ANT_LEFT) {
                         degrees = 180;
                     }
-                    Bitmap temp = ImageUtils.rotate(antBitmap, degrees);
+                    temp = ImageUtils.rotate(antBitmap, degrees);
                     bitmapRect.set(0, 0, temp.getWidth(), temp.getHeight());
                     canvas.drawBitmap(temp, bitmapRect, rect, paint);
                 }
@@ -208,8 +209,10 @@ public class MyView extends View {
 
     //设置蚂蚁移动下一步
     public void autoNext() {
-        autoNext = true;
-        next();
+        if (!autoNext) {
+            autoNext = true;
+            next();
+        }
     }
 
     //停止下一步停止
